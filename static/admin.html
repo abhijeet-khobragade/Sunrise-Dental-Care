@@ -1,0 +1,88 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Clinic Admin</title>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="/static/style.css">
+</head>
+<body>
+  <header class="site-header">
+    <div class="container nav">
+      <div class="logo"><span class="logo-mark">☀</span> Staff dashboard</div>
+      <nav class="nav-links"><a href="/">Back to site</a></nav>
+    </div>
+  </header>
+
+  <main class="container admin">
+    <form class="admin-login" id="login">
+      <input type="password" id="token" placeholder="Admin token (ADMIN_TOKEN in .env)" aria-label="Admin token">
+      <button class="btn-primary" style="margin-top:0">Load</button>
+      <span class="admin-error" id="error"></span>
+    </form>
+
+    <h2>Appointments</h2>
+    <div class="table-wrap" id="appointments"><p class="empty">Enter the admin token to load data.</p></div>
+
+    <h2>Hand-offs to staff</h2>
+    <div class="table-wrap" id="handoffs"><p class="empty">Enter the admin token to load data.</p></div>
+  </main>
+
+  <script>
+    // Build tables with textContent (never innerHTML) so stored chat text can't run as code.
+    function renderTable(containerId, rows, columns) {
+      const box = document.getElementById(containerId);
+      box.replaceChildren();
+      if (!rows.length) {
+        const p = document.createElement("p");
+        p.className = "empty";
+        p.textContent = "Nothing yet.";
+        box.append(p);
+        return;
+      }
+      const table = document.createElement("table");
+      const head = table.createTHead().insertRow();
+      columns.forEach(([, label]) => {
+        const th = document.createElement("th");
+        th.textContent = label;
+        head.append(th);
+      });
+      const body = table.createTBody();
+      rows.forEach((row) => {
+        const tr = body.insertRow();
+        columns.forEach(([key]) => (tr.insertCell().textContent = row[key]));
+      });
+      box.append(table);
+    }
+
+    async function load(token) {
+      const headers = { "X-Admin-Token": token };
+      const [a, h] = await Promise.all([
+        fetch("/api/admin/appointments", { headers }),
+        fetch("/api/admin/handoffs", { headers }),
+      ]);
+      if (!a.ok || !h.ok) throw new Error("Wrong admin token (or ADMIN_TOKEN is not set in .env).");
+      renderTable("appointments", await a.json(), [
+        ["id", "#"], ["date", "Date"], ["time", "Time"], ["patient_name", "Patient"],
+        ["phone", "Phone"], ["service", "Service"],
+      ]);
+      renderTable("handoffs", await h.json(), [
+        ["id", "#"], ["created_at", "When"], ["contact", "Contact"], ["reason", "Reason"],
+        ["summary", "Summary"], ["status", "Status"],
+      ]);
+    }
+
+    document.getElementById("login").addEventListener("submit", async (e) => {
+      e.preventDefault();
+      const error = document.getElementById("error");
+      error.textContent = "";
+      try {
+        await load(document.getElementById("token").value);
+      } catch (err) {
+        error.textContent = err.message;
+      }
+    });
+  </script>
+</body>
+</html>
